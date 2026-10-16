@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Pedido → Trello</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/style.css?v=9">
+  <script type="module" src="/static/app.js?v=9"></script>
+</head>
+<body>
+  <main class="demo">
+    <header class="page-header">
+      <div class="page-title"><h1>Pedido <span>→</span> Trello</h1><span class="demo-tag">Demo</span></div>
+      <div class="connection">
+        <span id="connection-status" class="status" role="status">Verificando Trello…</span>
+        <a id="connect-trello" href="/trello/connect" hidden>Conectar</a>
+      </div>
+    </header>
+
+    <div id="feedback" class="feedback" role="alert" hidden></div>
+
+    <div class="workspace">
+      <section class="order-panel surface" aria-labelledby="form-title">
+        <div class="section-heading">
+          <h2 id="form-title">Pedido</h2>
+        </div>
+        <section class="intake-panel" aria-label="Mensagem do pedido">
+          <div class="message-label"><label for="intake-text">Mensagem do pedido</label><div class="message-tools"><span id="ai-status" class="status compact" role="status">Verificando IA…</span><button id="text-example" class="button quiet small" type="button">Usar exemplo</button></div></div>
+          <textarea id="intake-text" rows="3" maxlength="12000" placeholder="Cole a mensagem do cliente aqui…" aria-describedby="intake-hint"></textarea>
+          <div class="intake-actions"><p id="intake-hint">Revise os dados depois de organizar.</p><button id="parse-button" class="button primary ai-action" type="button"><span class="ai-sparkle" aria-hidden="true">✦</span><span class="ai-button-label">Organizar com IA</span></button></div>
+          <p id="intake-feedback" class="inline-note" role="status" hidden></p>
+        </section>
+        <form id="order-form">
+          <fieldset id="order-fields">
+            <div class="field-row customer-row">
+              <label>Nº do pedido<input data-common name="order_id" required maxlength="50" pattern="[A-Za-z0-9_-]+" autocomplete="off" aria-describedby="id-hint"></label>
+              <label>Cliente<input data-common name="customer_name" maxlength="160" placeholder="Nome do cliente" autocomplete="off"></label>
+            </div>
+            <span id="id-hint" class="sr-only">Use letras, números, traços ou sublinhados. Cada envio deve ter um número único.</span>
+            <div class="field-row">
+              <label>Contato / protocolo<input data-common name="customer_contact" maxlength="200" placeholder="Ana · MZ-001" autocomplete="off"></label>
+              <label>Arquivo da arte<input data-common name="artwork_path" maxlength="600" placeholder="pedido.pdf" autocomplete="off" spellcheck="false"></label>
+            </div>
+            <details class="order-metadata"><summary>Arte e observações <span id="approval-summary">Sem aprovação</span></summary><label>Arte aprovada em<input data-common name="reference_at" type="datetime-local" step="60" aria-describedby="time-hint"></label><p id="time-hint" class="field-hint">Aprovação dos itens · São Paulo · corte às 16h</p><label for="notes">Observações do pedido</label><textarea data-common id="notes" name="notes" rows="2" maxlength="2000" placeholder="Instruções para todos os itens"></textarea></details>
+
+            <div class="items-heading"><h3>Produtos <span id="item-count" class="count">1</span></h3><button id="add-item" class="button quiet small" type="button"><span aria-hidden="true">＋</span> Adicionar</button></div>
+            <div class="product-columns" aria-hidden="true"><span>Produto</span><span>Qtd.</span><span>Medidas</span></div>
+            <div id="items"></div>
+            <p class="pending-hint">Sem informação completa, o item fica em Engatilhados.</p>
+
+          </fieldset>
+          <div class="form-actions"><span id="preview-state" role="status">Selecione um produto.</span><div class="button-group"><button id="example" class="button quiet small" type="button">Exemplo manual</button><button id="cutoff-demo" class="button quiet small" type="button">Corte das 16h</button></div></div>
+        </form>
+      </section>
+
+      <aside class="preview-panel surface" aria-labelledby="preview-title">
+        <div class="section-heading"><h2 id="preview-title">Cards no Trello</h2><span id="preview-badge" class="small muted" aria-live="polite">Prévia</span></div>
+        <div id="empty-state" class="empty-state"><div class="empty-cards" aria-hidden="true"><span></span><span></span></div><p>Os cards aparecem aqui.</p><span>Um por produto, no quadro certo.</span></div>
+        <div id="preview-content" hidden>
+          <p id="preview-summary" class="preview-summary" role="status"></p>
+          <div id="preview-cards"></div>
+          <details class="technical-details"><summary id="payload-title">JSON do pedido</summary><pre id="payload"></pre></details>
+          <div id="send-area" class="send-area"><button id="send-button" class="button primary" type="button" disabled>Criar no Trello</button><p id="send-hint">Revise os dados antes de criar.</p></div>
+        </div>
+        <section id="send-result" class="send-result" aria-live="polite" hidden><h3 id="result-title"></h3><div id="result-links"></div><p id="result-note"></p><div class="result-tools" id="result-tools" hidden><button id="sync-button" class="button secondary small" type="button">Conferir Trello</button><button id="replay-button" class="button secondary small" type="button">Reenviar pedido</button><button id="history-button" class="button secondary small" type="button">Histórico</button><button id="new-order" class="button quiet small" type="button">Novo pedido</button></div></section>
+      </aside>
+    </div>
+    <footer class="page-footer">Pedidos fictícios · Quadros de teste</footer>
+  </main>
+
+  <template id="item-template">
+    <section class="item" aria-label="Produto do pedido">
+      <span class="item-number sr-only"></span><span class="item-status sr-only"></span>
+      <div class="product-row"><label><span class="sr-only">Produto</span><select name="product_code" required></select></label><label><span class="sr-only">Quantidade <span class="unit"></span></span><input name="quantity" type="number" min="1" step="1" max="100000" placeholder="—"></label><label class="dimension-field"><span class="sr-only">Medidas / especificações</span><input name="dimensions" maxlength="200" placeholder="A confirmar"></label><button class="remove-item icon-button" type="button" title="Remover item" aria-label="Remover item">×</button></div>
+      <p class="raw-product field-hint" hidden></p>
+      <details class="item-extras"><summary>Detalhes do item</summary><label>Arquivo deste item<input name="artwork_path" maxlength="600" placeholder="Usar o arquivo do pedido" spellcheck="false"></label><label>Aprovação deste item<input name="reference_at" type="datetime-local" step="60"></label><label>Observações do item<textarea name="notes" rows="2" maxlength="2000"></textarea></label></details>
+    </section>
+  </template>
+  <template id="card-template">
+    <article class="preview-card">
+      <div class="card-top"><span class="product-label"></span><span class="card-status"></span></div>
+      <h3 class="card-title"></h3>
+      <div class="card-route"><span class="board-name"></span><span aria-hidden="true">→</span><strong class="list-name"></strong></div>
+      <p class="trello-confirmation" hidden></p>
+      <div class="card-deadline"><span class="deadline-label"></span><strong class="due-date"></strong><span class="cutoff-tag"></span></div>
+      <div class="missing" hidden><span>Falta confirmar</span><div class="missing-list"></div></div>
+      <details class="card-details"><summary>Modelo e descrição</summary><p class="template-name"></p><p class="deadline-explanation"></p><pre class="card-description"></pre></details>
+    </article>
+  </template>
+
+  <dialog id="production-dialog" class="modal" aria-labelledby="production-title">
+    <div class="modal-header"><h2 id="production-title">Produção</h2><button id="production-close" class="icon-button" type="button" aria-label="Fechar produção">×</button></div>
+    <div class="production-location"><span id="production-status"></span><strong id="production-current"></strong></div>
+    <p id="production-intro" class="production-intro"></p>
+    <fieldset id="production-steps" aria-label="Confirmações de produção"></fieldset>
+    <p id="production-message" class="inline-note" role="status"></p>
+    <p id="production-last-check" class="production-last-check"></p>
+    <div class="modal-actions production-actions"><span id="production-link"></span><button id="production-enable" class="button primary small" type="button">Ativar etapas</button><button id="production-toggle" class="button secondary small" type="button" hidden>Pausar automação</button></div>
+  </dialog>
+
+  <dialog id="followup-dialog" class="modal" aria-labelledby="followup-title">
+    <div class="modal-header"><h2 id="followup-title">Completar item</h2><button id="followup-close" class="icon-button" type="button" aria-label="Fechar complemento">×</button></div>
+    <p id="followup-question" class="followup-question"></p>
+    <form id="completion-form">
+      <div class="followup-intake"><label for="followup-answer">Sua resposta</label><textarea id="followup-answer" rows="2" maxlength="4000" placeholder="Ex.: 2,70 × 0,70 m"></textarea><button id="followup-parse" class="button primary ai-action" type="button"><span class="ai-sparkle" aria-hidden="true">✦</span> Organizar resposta</button></div>
+      <p id="followup-message" class="inline-note" role="status"></p>
+      <fieldset id="completion-fields"></fieldset>
+      <div class="completion-destination"><p id="completion-target"></p><p id="completion-rule"></p></div>
+      <div class="modal-actions"><button id="followup-save" class="button primary" type="submit" disabled>Atualizar card</button></div>
+    </form>
+  </dialog>
+  <dialog id="history-dialog" class="modal" aria-labelledby="history-title"><div class="modal-header"><h2 id="history-title">Histórico do pedido</h2><button class="icon-button" type="button" data-close-dialog aria-label="Fechar histórico">×</button></div><ol id="activity-list" class="activity-list"></ol></dialog>
+  <dialog id="cutoff-dialog" class="modal cutoff-modal" aria-labelledby="cutoff-title"><div class="modal-header"><h2 id="cutoff-title">O que muda às 16h</h2><button class="icon-button" type="button" data-close-dialog aria-label="Fechar comparação">×</button></div><p id="cutoff-product" class="modal-subtitle"></p><div class="cutoff-comparison"><article><span>Arte aprovada às 15:59</span><strong id="cutoff-before"></strong><p id="cutoff-before-rule"></p></article><article><span>Arte aprovada às 16:00</span><strong id="cutoff-after"></strong><p id="cutoff-after-rule"></p></article></div><p class="modal-footnote">Comparação local. Nenhum card é criado.</p></dialog>
+</body>
+</html>
